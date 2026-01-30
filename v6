@@ -1,0 +1,14 @@
+TypeError: 'numpy.bool' object cannot be interpreted as an integer
+Traceback:
+File "/tmp/appRoot/streamlit_app.py", line 637, in <module>
+    if st.button("Next", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1)):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/lib/python_udf/faa3914bd9506b4753eb5d52ce6e7b6b837d7f45fc8ff3e64bd3f809b3b6df14/lib/python3.11/site-packages/streamlit/runtime/metrics_util.py", line 447, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/lib/python_udf/faa3914bd9506b4753eb5d52ce6e7b6b837d7f45fc8ff3e64bd3f809b3b6df14/lib/python3.11/site-packages/streamlit/elements/widgets/button.py", line 266, in button
+    return self.dg._button(
+           ^^^^^^^^^^^^^^^^
+File "/usr/lib/python_udf/faa3914bd9506b4753eb5d52ce6e7b6b837d7f45fc8ff3e64bd3f809b3b6df14/lib/python3.11/site-packages/streamlit/elements/widgets/button.py", line 1155, in _button
+    button_proto.disabled = disabled
+    ^^^^^^^^^^^^^^^^^^^^^
