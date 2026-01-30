@@ -658,6 +658,7 @@ with tab4:
             WHERE AUDIT_CURRENT = TRUE
             GROUP BY SOURCE_SYSTEM
             ORDER BY COUNT(*) DESC
+            LIMIT 10
         """).to_pandas()
         st.markdown(render_dashboard_table(source_df, "Source System"), unsafe_allow_html=True)
 
@@ -668,6 +669,7 @@ with tab4:
             WHERE AUDIT_CURRENT = TRUE
             GROUP BY DATABASE_NAME
             ORDER BY COUNT(*) DESC
+            LIMIT 10
         """).to_pandas()
         st.markdown(render_dashboard_table(db_df, "Database Name"), unsafe_allow_html=True)
 
@@ -678,6 +680,7 @@ with tab4:
             WHERE AUDIT_CURRENT = TRUE AND MECHANISM IS NOT NULL AND MECHANISM != ''
             GROUP BY MECHANISM
             ORDER BY COUNT(*) DESC
+            LIMIT 10
         """).to_pandas()
         st.markdown(render_dashboard_table(mech_df, "Mechanism"), unsafe_allow_html=True)
 
@@ -689,17 +692,18 @@ with tab4:
             WHERE AUDIT_CURRENT = TRUE AND PROJECT IS NOT NULL AND PROJECT != ''
             GROUP BY PROJECT
             ORDER BY COUNT(*) DESC
+            LIMIT 10
         """).to_pandas()
         st.markdown(render_dashboard_table(project_df, "Project"), unsafe_allow_html=True)
 
-        st.markdown("#### By Interface Name (Top 20)")
+        st.markdown("#### By Interface Name")
         interface_df = session.sql(f"""
             SELECT INTERFACE_NAME as "Interface Name", COUNT(*) as "Count"
             FROM {TABLE}
             WHERE AUDIT_CURRENT = TRUE
             GROUP BY INTERFACE_NAME
             ORDER BY COUNT(*) DESC
-            LIMIT 20
+            LIMIT 10
         """).to_pandas()
         st.markdown(render_dashboard_table(interface_df, "Interface Name"), unsafe_allow_html=True)
 
@@ -710,6 +714,7 @@ with tab4:
             WHERE AUDIT_CURRENT = TRUE AND SOURCE_PATTERN IS NOT NULL AND SOURCE_PATTERN != ''
             GROUP BY SOURCE_PATTERN
             ORDER BY COUNT(*) DESC
+            LIMIT 10
         """).to_pandas()
         st.markdown(render_dashboard_table(pattern_df, "Source Pattern"), unsafe_allow_html=True)
 
