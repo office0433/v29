@@ -7,21 +7,16 @@ import streamlit as st
 
 st.set_page_config(layout="wide", page_title="Project Handover Form")
 
-# ──────────────────────────────────────────────────────────────────────────────
-# STYLES — Dark theme enforced
-# ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
-/* ── Base dark theme ── */
 html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
     background-color: #0e1117 !important; color: #fafafa !important;
 }
 [data-testid="stSidebar"] { background-color: #161b22 !important; }
 
-/* ── Inputs & selects ── */
 [data-testid="stSelectbox"] > div > div,
 [data-baseweb="select"] > div,
 textarea, input,
@@ -33,7 +28,6 @@ textarea, input,
 }
 input:focus, textarea:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 1px #3b82f6 !important; }
 
-/* ── Dropdowns ── */
 [data-baseweb="popover"], [data-baseweb="popover"] > div,
 [data-baseweb="menu"], [data-baseweb="menu"] li,
 ul[role="listbox"], ul[role="listbox"] li {
@@ -42,43 +36,33 @@ ul[role="listbox"], ul[role="listbox"] li {
 [data-baseweb="menu"] li:hover, ul[role="listbox"] li:hover { background-color: #2a3040 !important; }
 [data-baseweb="select"] svg { fill: #fafafa !important; }
 
-/* ── Tabs ── */
 [data-testid="stTabs"] button { background-color: transparent !important; color: #8b95a5 !important; font-weight: 600 !important; font-size: 18px !important; letter-spacing: 0.3px !important; padding: 12px 24px !important; text-transform: uppercase !important; }
 [data-testid="stTabs"] button[aria-selected="true"] { color: #fafafa !important; border-bottom: 3px solid #3b82f6 !important; }
 [data-testid="stTabs"] button:hover { color: #c0c8d4 !important; }
 
-/* ── Modal / Dialog ── */
 [data-testid="stModal"] { background-color: rgba(0,0,0,0.85) !important; }
 [data-testid="stModal"] > div, [data-testid="stModal"] > div > div,
 [role="dialog"] { background-color: #161b22 !important; color: #fafafa !important; border-radius: 12px !important; }
 [data-testid="stModal"] p, [data-testid="stModal"] span, [data-testid="stModal"] label,
 [role="dialog"] p, [role="dialog"] span, [role="dialog"] label { color: #fafafa !important; }
 
-/* ── Buttons ── */
 button { background-color: #1c2030 !important; color: #fafafa !important; border-color: #3a3f52 !important; border-radius: 6px !important; font-weight: 500 !important; }
 button:hover { background-color: #2a3040 !important; border-color: #4a5068 !important; }
 [data-testid="baseButton-primary"] { background: linear-gradient(135deg, #3b82f6, #2563eb) !important; color: #ffffff !important; border: none !important; }
 [data-testid="baseButton-primary"]:hover { background: linear-gradient(135deg, #2563eb, #1d4ed8) !important; }
 
-/* ── Expanders ── */
 [data-testid="stExpander"] { background-color: #161b22 !important; border: 1px solid #2a3040 !important; border-radius: 8px !important; margin-bottom: 8px !important; }
 [data-testid="stExpander"] summary { color: #fafafa !important; }
 [data-testid="stExpander"] summary:hover { color: #3b82f6 !important; }
 
-/* ── DataFrames ── */
 [data-testid="stDataFrame"] { border-radius: 8px !important; overflow: hidden !important; }
-[data-testid="stDataFrame"] td { text-align: left !important; }
-[data-testid="stDataFrame"] td:last-child,
-[data-testid="stDataFrame"] th:last-child { text-align: center !important; }
 
-/* ── Custom classes ── */
 .header-container {
     background: linear-gradient(135deg, #0f2744 0%, #1a3a5c 50%, #1e4976 100%);
     border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; text-align: center;
     border: 1px solid #1e3a5f;
 }
 .header-title { font-size: 26px !important; font-weight: 700; color: white; margin: 0; letter-spacing: -0.3px; }
-.header-subtitle { font-size: 13px; color: #8ba4c4; margin: 4px 0 0 0; }
 
 .info-box {
     background: #161b22; border: 1px solid #f39c12; border-left: 4px solid #f39c12;
@@ -116,12 +100,22 @@ button:hover { background-color: #2a3040 !important; border-color: #4a5068 !impo
 .filter-container { background: #161b22; border: 1px solid #2a3040; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
 
 .page-info { color: #8b95a5; font-size: 13px; text-align: center; padding: 8px 0; }
+
+.dashboard-table {
+    width: 100%; border-collapse: collapse; font-size: 13px; color: #e6edf3;
+}
+.dashboard-table th {
+    background: #1c2030; color: #8b95a5; font-weight: 600; text-transform: uppercase;
+    font-size: 11px; letter-spacing: 0.5px; padding: 10px 14px; border-bottom: 1px solid #2a3040;
+    text-align: left;
+}
+.dashboard-table th:last-child { text-align: center; }
+.dashboard-table td { padding: 8px 14px; border-bottom: 1px solid #1c2030; }
+.dashboard-table td:last-child { text-align: center; font-weight: 600; color: #3b82f6; }
+.dashboard-table tr:hover { background: #1c2030; }
 </style>
 """, unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# SESSION STATE
-# ──────────────────────────────────────────────────────────────────────────────
 defaults = {
     "delete_confirm_step": 0, "delete_target": None,
     "edit_mode": False, "edit_index": None,
@@ -132,18 +126,12 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ──────────────────────────────────────────────────────────────────────────────
-# SNOWFLAKE SESSION & USER
-# ──────────────────────────────────────────────────────────────────────────────
 session = Session.builder.getOrCreate()
 user_info = st.user
 user_email = user_info.get("email") if user_info else "unknown@company.com"
 
 TABLE = "DB_CORE_PRD.BACKUP_OPS.INSIGHTS_CORE_INGESTION"
 
-# ──────────────────────────────────────────────────────────────────────────────
-# CONSTANTS
-# ──────────────────────────────────────────────────────────────────────────────
 SOURCE_PATTERN_OPTIONS = ["-- Select --", "DB", "Flat File", "API", "JSON", "CSV", "XML"]
 MECHANISM_OPTIONS = ["-- Select --", "Push", "Pull"]
 PRIORITY_OPTIONS = ["-- Select --", "P1", "P2", "P3"]
@@ -159,15 +147,14 @@ FIELD_COLUMNS = [
     "SOURCE_SERVICE_NOW_GROUP", "ENGINEER_EMAIL_ID", "HLD", "IFM", "COMMENTS"
 ]
 
-# ──────────────────────────────────────────────────────────────────────────────
-# HELPER FUNCTIONS
-# ──────────────────────────────────────────────────────────────────────────────
+
 def clean_input(text):
     if not text:
         return ""
     text = text.strip()
     text = re.sub(r' +', ' ', text)
     return text
+
 
 def validate_form(data):
     errors = []
@@ -182,6 +169,7 @@ def validate_form(data):
                 errors.append(field + " has leading or trailing spaces")
     return errors
 
+
 def clean_all_fields(data):
     cleaned = {}
     for key, value in data.items():
@@ -192,18 +180,43 @@ def clean_all_fields(data):
             cleaned[key] = value
     return cleaned
 
-def get_total_count():
-    return session.sql(f"SELECT COUNT(*) as cnt FROM {TABLE} WHERE AUDIT_CURRENT = TRUE").to_pandas()['CNT'].iloc[0]
 
-def load_entries_page(offset=0, limit=RECORDS_PER_PAGE):
+def get_total_count(search_term="", filter_source="All", filter_priority="All", filter_db="All"):
+    where = "AUDIT_CURRENT = TRUE"
+    if search_term:
+        safe_search = search_term.replace("'", "''")
+        search_conditions = " OR ".join([f"{col} ILIKE '%{safe_search}%'" for col in FIELD_COLUMNS])
+        where += f" AND ({search_conditions})"
+    if filter_source != "All":
+        where += f" AND SOURCE_SYSTEM = '{filter_source.replace(chr(39), chr(39)+chr(39))}'"
+    if filter_priority != "All":
+        where += f" AND PRIORITY = '{filter_priority.replace(chr(39), chr(39)+chr(39))}'"
+    if filter_db != "All":
+        where += f" AND DATABASE_NAME = '{filter_db.replace(chr(39), chr(39)+chr(39))}'"
+    return int(session.sql(f"SELECT COUNT(*) as cnt FROM {TABLE} WHERE {where}").to_pandas()['CNT'].iloc[0])
+
+
+def load_entries_page(offset=0, limit=RECORDS_PER_PAGE, search_term="", filter_source="All", filter_priority="All", filter_db="All"):
+    where = "AUDIT_CURRENT = TRUE"
+    if search_term:
+        safe_search = search_term.replace("'", "''")
+        search_conditions = " OR ".join([f"{col} ILIKE '%{safe_search}%'" for col in FIELD_COLUMNS])
+        where += f" AND ({search_conditions})"
+    if filter_source != "All":
+        where += f" AND SOURCE_SYSTEM = '{filter_source.replace(chr(39), chr(39)+chr(39))}'"
+    if filter_priority != "All":
+        where += f" AND PRIORITY = '{filter_priority.replace(chr(39), chr(39)+chr(39))}'"
+    if filter_db != "All":
+        where += f" AND DATABASE_NAME = '{filter_db.replace(chr(39), chr(39)+chr(39))}'"
     df = session.sql(f"""
         SELECT {', '.join(FIELD_COLUMNS)}
         FROM {TABLE}
-        WHERE AUDIT_CURRENT = TRUE
+        WHERE {where}
         ORDER BY SOURCE_SYSTEM, INTERFACE_NAME
         LIMIT {limit} OFFSET {offset}
     """).to_pandas()
     return df.to_dict('records')
+
 
 def load_all_entries():
     df = session.sql(f"""
@@ -213,6 +226,7 @@ def load_all_entries():
         ORDER BY SOURCE_SYSTEM, INTERFACE_NAME
     """).to_pandas()
     return df
+
 
 def check_duplicate_in_db(source_system, interface_name, database_name, psg_table_name):
     safe = {
@@ -231,6 +245,7 @@ def check_duplicate_in_db(source_system, interface_name, database_name, psg_tabl
     """).to_pandas()
     return result['CNT'].iloc[0] > 0
 
+
 def insert_entry(data):
     safe = {k: str(v).replace("'", "''") if v else "" for k, v in data.items()}
     cols = ", ".join(FIELD_COLUMNS)
@@ -246,6 +261,7 @@ def insert_entry(data):
     """
     session.sql(sql).collect()
 
+
 def update_entry(old_pk, data):
     safe_old = {k: str(v).replace("'", "''") for k, v in old_pk.items()}
     session.sql(f"""
@@ -259,6 +275,7 @@ def update_entry(old_pk, data):
     """).collect()
     insert_entry(data)
 
+
 def delete_entry(pk):
     safe_pk = {k: str(v).replace("'", "''") for k, v in pk.items()}
     session.sql(f"""
@@ -271,6 +288,7 @@ def delete_entry(pk):
           AND AUDIT_CURRENT = TRUE
     """).collect()
 
+
 def get_distinct_values(column):
     df = session.sql(f"""
         SELECT DISTINCT {column} FROM {TABLE}
@@ -279,31 +297,27 @@ def get_distinct_values(column):
     """).to_pandas()
     return ["All"] + df[column].tolist()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# LOAD DATA
-# ──────────────────────────────────────────────────────────────────────────────
-total_count = get_total_count()
-page_offset = st.session_state.current_page * RECORDS_PER_PAGE
-entries = load_entries_page(offset=page_offset, limit=RECORDS_PER_PAGE)
-total_pages = int(max(1, (total_count + RECORDS_PER_PAGE - 1) // RECORDS_PER_PAGE))
 
-# ──────────────────────────────────────────────────────────────────────────────
-# HEADER
-# ──────────────────────────────────────────────────────────────────────────────
+def render_dashboard_table(df, name_col, count_col="Count"):
+    rows_html = ""
+    for _, row in df.iterrows():
+        rows_html += f"<tr><td>{row[name_col]}</td><td>{int(row[count_col])}</td></tr>"
+    return f"""
+    <table class="dashboard-table">
+        <thead><tr><th>{name_col}</th><th>{count_col}</th></tr></thead>
+        <tbody>{rows_html}</tbody>
+    </table>
+    """
+
+
 st.markdown(f"""
 <div class="header-container">
     <h1 class="header-title">Project Handover Form</h1>
 </div>
 """, unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TABS
-# ──────────────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4 = st.tabs(["New Entry", "Existing Entries", "History", "Dashboard"])
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — NEW ENTRY
-# ══════════════════════════════════════════════════════════════════════════════
 with tab1:
     st.markdown("""
     <div class="info-box">
@@ -323,7 +337,6 @@ with tab1:
         st.session_state.success_message = None
         st.session_state.success_tab = None
 
-    # ── Manual entry form ──
     st.markdown('<div class="section-label">Interface Details</div>', unsafe_allow_html=True)
 
     with st.form("new_entry_form"):
@@ -389,16 +402,42 @@ with tab1:
                         st.error(f"Failed to save entry: {str(e)}")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — EXISTING ENTRIES
-# ══════════════════════════════════════════════════════════════════════════════
 with tab2:
     if st.session_state.success_message and st.session_state.success_tab == "tab2":
         st.markdown(f'<div class="success-box">{st.session_state.success_message}</div>', unsafe_allow_html=True)
         st.session_state.success_message = None
         st.session_state.success_tab = None
 
-    # ── Metric cards ──
+    st.markdown('<div class="section-label">Search & Filter</div>', unsafe_allow_html=True)
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    with fc1:
+        search_term = st.text_input("Search", placeholder="Free text search...", label_visibility="collapsed", key="tab2_search")
+    with fc2:
+        source_systems = get_distinct_values("SOURCE_SYSTEM")
+        filter_source = st.selectbox("Source System", source_systems, key="filter_source", label_visibility="collapsed")
+    with fc3:
+        priorities = get_distinct_values("PRIORITY")
+        filter_priority = st.selectbox("Priority", priorities, key="filter_priority", label_visibility="collapsed")
+    with fc4:
+        databases = get_distinct_values("DATABASE_NAME")
+        filter_db = st.selectbox("Database", databases, key="filter_db", label_visibility="collapsed")
+
+    if search_term or filter_source != "All" or filter_priority != "All" or filter_db != "All":
+        st.session_state.current_page = 0
+
+    total_count = get_total_count(search_term, filter_source, filter_priority, filter_db)
+    total_pages = int(max(1, (total_count + RECORDS_PER_PAGE - 1) // RECORDS_PER_PAGE))
+
+    if st.session_state.current_page >= total_pages:
+        st.session_state.current_page = total_pages - 1
+
+    page_offset = st.session_state.current_page * RECORDS_PER_PAGE
+    entries = load_entries_page(
+        offset=page_offset, limit=RECORDS_PER_PAGE,
+        search_term=search_term, filter_source=filter_source,
+        filter_priority=filter_priority, filter_db=filter_db
+    )
+
     m1, m2, m3, m4 = st.columns(4)
     with m1:
         st.markdown(f'<div class="metric-card"><p class="metric-value">{total_count}</p><p class="metric-label">Total Records</p></div>', unsafe_allow_html=True)
@@ -414,47 +453,10 @@ with tab2:
 
     st.markdown("")
 
-    # ── Filters ──
-    st.markdown('<div class="section-label">Search & Filter</div>', unsafe_allow_html=True)
-    fc1, fc2, fc3, fc4 = st.columns(4)
-    with fc1:
-        search_term = st.text_input("Search", placeholder="Free text search...", label_visibility="collapsed", key="tab2_search")
-    with fc2:
-        source_systems = get_distinct_values("SOURCE_SYSTEM")
-        filter_source = st.selectbox("Source System", source_systems, key="filter_source", label_visibility="collapsed")
-    with fc3:
-        priorities = get_distinct_values("PRIORITY")
-        filter_priority = st.selectbox("Priority", priorities, key="filter_priority", label_visibility="collapsed")
-    with fc4:
-        databases = get_distinct_values("DATABASE_NAME")
-        filter_db = st.selectbox("Database", databases, key="filter_db", label_visibility="collapsed")
-
-    # ── Export section ──
     exp_col1, exp_col2, exp_col3 = st.columns([1, 1, 3])
     with exp_col1:
-        # Export filtered view (current page data filtered)
-        filtered_display = entries  # will be filtered below
-        export_filtered_btn = st.empty()
-    with exp_col2:
-        # Export all from DB
-        export_all_btn = st.empty()
-
-    # Apply filters
-    filtered_entries = entries
-    if search_term:
-        search_lower = search_term.lower()
-        filtered_entries = [e for e in filtered_entries if any(search_lower in str(v).lower() for v in e.values())]
-    if filter_source != "All":
-        filtered_entries = [e for e in filtered_entries if e.get("SOURCE_SYSTEM") == filter_source]
-    if filter_priority != "All":
-        filtered_entries = [e for e in filtered_entries if e.get("PRIORITY") == filter_priority]
-    if filter_db != "All":
-        filtered_entries = [e for e in filtered_entries if e.get("DATABASE_NAME") == filter_db]
-
-    # Export buttons
-    with exp_col1:
-        if filtered_entries:
-            csv_filtered = pd.DataFrame(filtered_entries).to_csv(index=False)
+        if entries:
+            csv_filtered = pd.DataFrame(entries).to_csv(index=False)
             st.download_button("Export Current View", data=csv_filtered,
                                file_name="handover_filtered_export.csv", mime="text/csv",
                                use_container_width=True)
@@ -467,7 +469,6 @@ with tab2:
 
     st.markdown("")
 
-    # ── View mode toggle ──
     vt1, vt2, vt3 = st.columns([1, 1, 5])
     with vt1:
         if st.button("Card View", use_container_width=True,
@@ -480,16 +481,14 @@ with tab2:
             st.session_state.view_mode = "table"
             st.rerun()
 
-    if not filtered_entries:
+    if not entries:
         st.info("No entries found matching your filters.")
     elif st.session_state.view_mode == "table":
-        # ── Table view ──
-        display_df = pd.DataFrame(filtered_entries)
+        display_df = pd.DataFrame(entries)
         display_df.columns = [c.replace("_", " ").title() for c in display_df.columns]
         st.dataframe(display_df, use_container_width=True, hide_index=True, height=500)
     else:
-        # ── Card view ──
-        for idx, entry in enumerate(filtered_entries):
+        for idx, entry in enumerate(entries):
             with st.expander(f"**{entry['SOURCE_SYSTEM']}**  |  {entry['INTERFACE_NAME']}  |  {entry['DATABASE_NAME']}  |  {entry.get('PRIORITY', '')}"):
                 col1, col2 = st.columns(2)
                 with col1:
@@ -564,7 +563,6 @@ with tab2:
                             st.session_state.delete_target = None
                             st.rerun()
 
-    # ── Pagination ──
     st.markdown("---")
     st.markdown(f'<div class="page-info">Page {st.session_state.current_page + 1} of {total_pages}  ({total_count} records)</div>', unsafe_allow_html=True)
     pg1, pg2, pg3, pg4, pg5 = st.columns([2, 1, 1, 1, 2])
@@ -587,9 +585,6 @@ with tab2:
             st.session_state.delete_target = None
             st.rerun()
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — HISTORY (with change details)
-# ══════════════════════════════════════════════════════════════════════════════
 with tab3:
     st.markdown('<div class="section-label">Recent Changes</div>', unsafe_allow_html=True)
 
@@ -634,16 +629,13 @@ with tab3:
         else:
             st.info("No changes in the last 30 days.")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — DASHBOARD
-# ══════════════════════════════════════════════════════════════════════════════
 with tab4:
     st.markdown('<div class="section-label">Summary Dashboard</div>', unsafe_allow_html=True)
 
-    # ── Top metrics ──
     d1, d2, d3, d4 = st.columns(4)
     with d1:
-        st.markdown(f'<div class="metric-card"><p class="metric-value">{total_count}</p><p class="metric-label">Total Interfaces</p></div>', unsafe_allow_html=True)
+        dash_total = get_total_count()
+        st.markdown(f'<div class="metric-card"><p class="metric-value">{dash_total}</p><p class="metric-label">Total Interfaces</p></div>', unsafe_allow_html=True)
     with d2:
         p1_count = session.sql(f"SELECT COUNT(*) as c FROM {TABLE} WHERE AUDIT_CURRENT = TRUE AND PRIORITY = 'P1'").to_pandas()['C'].iloc[0]
         st.markdown(f'<div class="metric-card"><p class="metric-value">{p1_count}</p><p class="metric-label">P1 Priority</p></div>', unsafe_allow_html=True)
@@ -667,8 +659,7 @@ with tab4:
             GROUP BY SOURCE_SYSTEM
             ORDER BY COUNT(*) DESC
         """).to_pandas()
-        st.dataframe(source_df, use_container_width=True, hide_index=True,
-                     column_config={"Count": st.column_config.NumberColumn("Count", width="small")})
+        st.markdown(render_dashboard_table(source_df, "Source System"), unsafe_allow_html=True)
 
         st.markdown("#### By Database Name")
         db_df = session.sql(f"""
@@ -678,8 +669,7 @@ with tab4:
             GROUP BY DATABASE_NAME
             ORDER BY COUNT(*) DESC
         """).to_pandas()
-        st.dataframe(db_df, use_container_width=True, hide_index=True,
-                     column_config={"Count": st.column_config.NumberColumn("Count", width="small")})
+        st.markdown(render_dashboard_table(db_df, "Database Name"), unsafe_allow_html=True)
 
         st.markdown("#### By Mechanism")
         mech_df = session.sql(f"""
@@ -689,8 +679,7 @@ with tab4:
             GROUP BY MECHANISM
             ORDER BY COUNT(*) DESC
         """).to_pandas()
-        st.dataframe(mech_df, use_container_width=True, hide_index=True,
-                     column_config={"Count": st.column_config.NumberColumn("Count", width="small")})
+        st.markdown(render_dashboard_table(mech_df, "Mechanism"), unsafe_allow_html=True)
 
     with col2:
         st.markdown("#### By Project")
@@ -701,8 +690,7 @@ with tab4:
             GROUP BY PROJECT
             ORDER BY COUNT(*) DESC
         """).to_pandas()
-        st.dataframe(project_df, use_container_width=True, hide_index=True,
-                     column_config={"Count": st.column_config.NumberColumn("Count", width="small")})
+        st.markdown(render_dashboard_table(project_df, "Project"), unsafe_allow_html=True)
 
         st.markdown("#### By Interface Name (Top 20)")
         interface_df = session.sql(f"""
@@ -713,8 +701,7 @@ with tab4:
             ORDER BY COUNT(*) DESC
             LIMIT 20
         """).to_pandas()
-        st.dataframe(interface_df, use_container_width=True, hide_index=True,
-                     column_config={"Count": st.column_config.NumberColumn("Count", width="small")})
+        st.markdown(render_dashboard_table(interface_df, "Interface Name"), unsafe_allow_html=True)
 
         st.markdown("#### By Source Pattern")
         pattern_df = session.sql(f"""
@@ -724,12 +711,8 @@ with tab4:
             GROUP BY SOURCE_PATTERN
             ORDER BY COUNT(*) DESC
         """).to_pandas()
-        st.dataframe(pattern_df, use_container_width=True, hide_index=True,
-                     column_config={"Count": st.column_config.NumberColumn("Count", width="small")})
+        st.markdown(render_dashboard_table(pattern_df, "Source Pattern"), unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EDIT DIALOG
-# ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.edit_mode and st.session_state.edit_index is not None:
     entry = st.session_state.get("edit_entry", entries[st.session_state.edit_index])
 
@@ -825,9 +808,6 @@ if st.session_state.edit_mode and st.session_state.edit_index is not None:
 
     edit_dialog()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# FOOTER
-# ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style="position: fixed; bottom: 10px; right: 20px; font-size: 11px; color: #4a5068;">
     Any issues with the app? Contact <strong style="color: #8b95a5;">Sandesh Shetty</strong>
