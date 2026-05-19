@@ -1,100 +1,149 @@
-import re
-import html
-import pandas as pd
-from snowflake.snowpark import Session
-import streamlit as st
+            st.session_state._edit_pk = current_edit_pk
+            for state_key, default_value in current_edit_defaults.items():
+                st.session_state[state_key] = default_value
+        else:
+            for state_key, default_value in current_edit_defaults.items():
+                if state_key not in st.session_state:
+                    st.session_state[state_key] = default_value
+            if not safe_str(st.session_state.get("edit_engineer_email")).strip():
+                st.session_state.edit_engineer_email = current_edit_defaults["edit_engineer_email"]
 
-st.set_page_config(layout="wide", page_title="Project Handover Form")
+        def _on_edit_encrypted_change():
+            if st.session_state.edit_encrypted != "YES":
+                st.session_state.edit_expiration_date = None
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown('<div class="section-label">Primary Key</div>', unsafe_allow_html=True)
+            source_system = st.text_input("Source System *", key="edit_source_system", max_chars=500)
+            show_inline_error(source_system, "SOURCE_SYSTEM")
+            interface_name = st.text_input("Interface Name *", key="edit_interface_name", max_chars=500)
+            show_inline_error(interface_name, "INTERFACE_NAME")
+            database_name = st.text_input("Database Name *", key="edit_database_name", max_chars=500)
+            show_inline_error(database_name, "DATABASE_NAME")
+            psg_table_name = st.text_input("PSG Table Name *", key="edit_psg_table_name", max_chars=500)
+            show_inline_error(psg_table_name, "PSG_TABLE_NAME")
+            st.markdown('<div class="section-label">Details</div>', unsafe_allow_html=True)
+            project = st.text_input("Project *", key="edit_project", max_chars=500)
+            show_inline_error(project, "PROJECT")
+            source_pattern = st.selectbox(
+                "Source Pattern *",
+                options_with_existing(SOURCE_PATTERN_OPTIONS, st.session_state.get("edit_source_pattern")),
+                key="edit_source_pattern",
+            )
+            mechanism = st.selectbox(
+                "Mechanism *",
+                options_with_existing(MECHANISM_OPTIONS, st.session_state.get("edit_mechanism")),
+                key="edit_mechanism",
+            )
+            time_of_landing = st.text_input("Time of Landing *", key="edit_time_of_landing", max_chars=500, placeholder="e.g. Daily, Weekly, Hourly, 6:00 AM AEST")
+            show_inline_error(time_of_landing, "TIME_OF_LANDING")
+        with col2:
+            st.markdown('<div class="section-label">Table & Classification</div>', unsafe_allow_html=True)
+            stage_table_name = st.text_input("Stage Table Name *", key="edit_stage_table_name", max_chars=500)
+            show_inline_error(stage_table_name, "STAGE_TABLE_NAME")
+            priority = st.selectbox(
+                "Priority *",
+                options_with_existing(PRIORITY_OPTIONS, st.session_state.get("edit_priority")),
+                key="edit_priority",
+            )
+            load_bronze = st.selectbox(
+                "Load to Data Bronze Products *",
+                options_with_existing(LOAD_BRONZE_OPTIONS, st.session_state.get("edit_load_bronze")),
+                key="edit_load_bronze",
+            )
+            encrypted = st.selectbox(
+                "Encrypted *",
+                options_with_existing(ENCRYPTED_OPTIONS, st.session_state.get("edit_encrypted")),
+                key="edit_encrypted", on_change=_on_edit_encrypted_change,
+            )
+            if encrypted == "YES":
+                expiration_date = st.date_input(
+                    "Expiration Date *",
+                    key="edit_expiration_date",
+                )
+                show_inline_error(expiration_date, "EXPIRATION_DATE", encrypted_value=encrypted)
+            else:
+                st.markdown(
+                    '<label style="font-size:14px;color:#fafafa;margin-bottom:4px;display:block;">Expiration Date</label>'
+                    '<div style="background:#12151c;border:1px solid #2a3040;border-radius:6px;padding:10px 14px;'
+                    'color:#4a5068;font-size:14px;">Select Encrypted = YES to enable</div>',
+                    unsafe_allow_html=True,
+                )
+                expiration_date = None
+            st.markdown('<div class="section-label">Contacts</div>', unsafe_allow_html=True)
+            source_contact = st.text_input("Source Contact *", key="edit_source_contact", max_chars=500)
+            show_inline_error(source_contact, "SOURCE_CONTACT")
+            source_snow_group = st.text_input("Source Service Now Group *", key="edit_source_snow_group", max_chars=500)
+            show_inline_error(source_snow_group, "SOURCE_SERVICE_NOW_GROUP")
+            engineer_email = st.text_input("Engineer Email ID *", key="edit_engineer_email", disabled=True)
+            st.markdown('<div class="section-label">Documentation</div>', unsafe_allow_html=True)
+            hld = st.text_input("HLD (Confluence URL) *", key="edit_hld", max_chars=500)
+            show_inline_error(hld, "HLD")
+            ifm = st.text_input("IFM (Confluence URL) *", key="edit_ifm", max_chars=500)
+            show_inline_error(ifm, "IFM")
+        comments = st.text_area("Comments", key="edit_comments", height=100, max_chars=2000)
+        show_inline_error(comments, "COMMENTS")
+
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            if st.button("Update", type="primary", use_container_width=True):
+                updated_data = {
+                    "SOURCE_SYSTEM": source_system, "PROJECT": project, "INTERFACE_NAME": interface_name,
+                    "SOURCE_PATTERN": source_pattern, "MECHANISM": mechanism, "TIME_OF_LANDING": time_of_landing,
+                    "DATABASE_NAME": database_name, "STAGE_TABLE_NAME": stage_table_name, "PSG_TABLE_NAME": psg_table_name,
+                    "PRIORITY": priority, "LOAD_TO_DATA_BRONZE_PRODUCTS": load_bronze, "SOURCE_CONTACT": source_contact,
+                    "SOURCE_SERVICE_NOW_GROUP": source_snow_group, "ENGINEER_EMAIL_ID": engineer_email,
+                    "HLD": hld, "IFM": ifm, "COMMENTS": comments,
+                    "ENCRYPTED": encrypted, "EXPIRATION_DATE": expiration_date
+                }
+                errors = validate_form(updated_data)
+                if errors:
+                    st.error("Please fix the following errors before updating:")
+                    for category, fields in errors:
+                        st.markdown(f'<div class="error-msg"><strong>{category}:</strong> {", ".join(fields)}</div>', unsafe_allow_html=True)
+                else:
+                    updated_data = clean_all_fields(updated_data)
+                    old_pk = {
+                        "SOURCE_SYSTEM": safe_str(entry.get("SOURCE_SYSTEM")),
+                        "INTERFACE_NAME": safe_str(entry.get("INTERFACE_NAME")),
+                        "DATABASE_NAME": safe_str(entry.get("DATABASE_NAME")),
+                        "PSG_TABLE_NAME": safe_str(entry.get("PSG_TABLE_NAME"))
+                    }
+                    new_pk = {
+                        "SOURCE_SYSTEM": updated_data["SOURCE_SYSTEM"],
+                        "INTERFACE_NAME": updated_data["INTERFACE_NAME"],
+                        "DATABASE_NAME": updated_data["DATABASE_NAME"],
+                        "PSG_TABLE_NAME": updated_data["PSG_TABLE_NAME"]
+                    }
+                    pk_changed = any(old_pk[k].upper() != new_pk[k].upper() for k in old_pk)
+                    if pk_changed and check_duplicate_in_db(
+                        new_pk["SOURCE_SYSTEM"], new_pk["INTERFACE_NAME"],
+                        new_pk["DATABASE_NAME"], new_pk["PSG_TABLE_NAME"]
+                    ):
+                        st.error("An entry with this primary key combination already exists.")
+                    else:
+                        try:
+                            update_entry(old_pk, updated_data, modified_by=user_email)
+                            st.session_state.edit_mode = False
+                            st.session_state.edit_index = None
+                            st.session_state.pop("edit_entry", None)
+                            st.session_state.success_message = "Entry updated successfully."
+                            st.session_state.success_tab = "tab2"
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to update entry: {str(e)}")
+        with btn_col2:
+            if st.button("Cancel", use_container_width=True):
+                st.session_state.edit_mode = False
+                st.session_state.edit_index = None
+                st.session_state.pop("edit_entry", None)
+                st.rerun()
+
+    edit_dialog()
 
 st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-
-/* ===== GLOBAL DARK THEME OVERRIDE ===== */
-html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"],
-[data-testid="stHeader"], [data-testid="stMain"],
-[data-testid="stMainBlockContainer"], [data-testid="stVerticalBlock"],
-[data-testid="stHorizontalBlock"], [data-testid="stForm"],
-[data-testid="stBottomBlockContainer"], .main, .block-container,
-section[data-testid="stSidebar"], [data-testid="stSidebarContent"] {
-    background-color: #0e1117 !important; color: #fafafa !important;
-}
-[data-testid="stSidebar"] { background-color: #161b22 !important; }
-
-/* ===== ALL TEXT ELEMENTS — force light text on dark bg ===== */
-p, span, label, div, li, ul, ol, h1, h2, h3, h4, h5, h6, a,
-strong, em, b, i, small, td, th, caption, figcaption,
-[data-testid="stMarkdown"], [data-testid="stMarkdown"] p,
-[data-testid="stMarkdown"] span, [data-testid="stMarkdown"] li,
-[data-testid="stMarkdown"] strong, [data-testid="stMarkdown"] em,
-[data-testid="stMarkdown"] h1, [data-testid="stMarkdown"] h2,
-[data-testid="stMarkdown"] h3, [data-testid="stMarkdown"] h4,
-[data-testid="stText"], [data-testid="stCaptionContainer"],
-[data-testid="stCaptionContainer"] *, [class*="Caption"] {
-    color: #fafafa !important;
-}
-
-/* ===== FORM LABELS — field names must be visible ===== */
-[data-testid="stTextInput"] label,
-[data-testid="stTextInput"] label p,
-[data-testid="stTextInput"] label span,
-[data-testid="stTextArea"] label,
-[data-testid="stTextArea"] label p,
-[data-testid="stTextArea"] label span,
-[data-testid="stSelectbox"] label,
-[data-testid="stSelectbox"] label p,
-[data-testid="stSelectbox"] label span,
-[data-testid="stMultiSelect"] label,
-[data-testid="stMultiSelect"] label p,
-[data-testid="stMultiSelect"] label span,
-[data-testid="stNumberInput"] label,
-[data-testid="stNumberInput"] label p,
-[data-testid="stNumberInput"] label span,
-[data-testid="stDateInput"] label,
-[data-testid="stDateInput"] label p,
-[data-testid="stDateInput"] label span,
-[data-testid="stCheckbox"] label,
-[data-testid="stCheckbox"] label p,
-[data-testid="stCheckbox"] label span,
-[data-testid="stRadio"] label,
-[data-testid="stRadio"] label p,
-[data-testid="stRadio"] label span,
-[data-testid="stSlider"] label,
-[data-testid="stSlider"] label p,
-[data-testid="stSlider"] label span,
-[data-testid="stFileUploader"] label,
-[data-testid="stFileUploader"] label p,
-[data-testid="stFileUploader"] label span,
-.stTextInput label, .stTextArea label, .stSelectbox label,
-[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p,
-[data-testid="stWidgetLabel"] span {
-    color: #fafafa !important;
-}
-
-/* ===== INPUT FIELDS ===== */
-[data-testid="stSelectbox"] > div > div,
-[data-baseweb="select"] > div,
-textarea, input,
-[data-testid="stTextArea"] textarea,
-[data-testid="stTextArea"] > div,
-[data-testid="stTextInput"] > div > div,
-[data-testid="stTextInput"] input,
-[data-testid="stNumberInput"] input,
-[data-testid="stDateInput"] input {
-    background-color: #1c2030 !important; color: #fafafa !important; border-color: #3a3f52 !important;
-    border-radius: 6px !important;
-}
-input::placeholder, textarea::placeholder { color: #6b7280 !important; }
-input:focus, textarea:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 1px #3b82f6 !important; }
-/* Disabled inputs */
-input:disabled, textarea:disabled,
-[data-testid="stTextInput"] input:disabled {
-    background-color: #12151c !important; color: #8b95a5 !important;
-    border-color: #2a3040 !important; -webkit-text-fill-color: #8b95a5 !important;
-}
-
-/* ===== DROPDOWNS / POPOVER MENUS ===== */
-[data-baseweb="popover"], [data-baseweb="popover"] > div,
-[data-baseweb="menu"], [data-baseweb="menu"] li,
-ul[role="listbox"], ul[role="listbox"] li,
+<div style="position: fixed; bottom: 10px; right: 20px; font-size: 11px; color: #4a5068;">
+    Any issues with the app? Contact <strong style="color: #8b95a5;">Sandesh Shetty</strong>
+</div>
+""", unsafe_allow_html=True)
