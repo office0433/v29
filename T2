@@ -1,118 +1,28 @@
-create or replace view DB_CORE_PRD.PSG.VW_NEW_INGESTION_STATUS_LAST_14_DAYS(
-	TABLE_NAME,
-	FIRST_RUN_DATE,
-	RUN_DATE,
-	RUN_STATUS
-) as
- 
-WITH
- 
-  /* find all “new” tables that are in the ingestion view but not in your static table */
- 
-  NEW_TABLES AS (
- 
-    SELECT DISTINCT VS.TABLE_NAME
- 
-    FROM   DB_CORE_PRD.PSG.VW_CORE_INGESTION_SF_LOAD_STATUS VS
- 
-    WHERE  NOT EXISTS (
- 
-      SELECT 1
- 
-      FROM   DB_CORE_PRD.PSG.OPS_TEAM_STATIC_INTERFACE_TABLE SIT
- 
-      WHERE  SIT.TABLE_NAME = VS.TABLE_NAME
- 
+WITH NEW_TABLES AS (
+    SELECT DISTINCT M.PSG_TABLE_NAME AS TABLE_NAME
+    FROM DB_CORE_PRD.PMD.INSIGHTS_CORE_INGESTION M
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM DB_CORE_PRD.PSG.OPS_TEAM_STATIC_INTERFACE_TABLE SIT
+        WHERE SIT.TABLE_NAME = M.PSG_TABLE_NAME
     )
- 
-  ),
- 
-  /* generate the calendar of the last 14 days (including today) */
- 
-  LAST_14_DAYS AS (
- 
-    SELECT DAY_DT
- 
-    FROM   DB_CORE_PRD.PSG.TIME_DAY_DM
- 
-    WHERE  DAY_DT BETWEEN DATEADD(DAY, -13, CURRENT_DATE()) AND CURRENT_DATE()
- 
-  ),
- 
-    /* for each new table the first run date is taken */
- 
- FIRST_RUN as (
-  select TABLE_NAME,
-         min(cast(START_DT as date)) as FIRST_RUN_DATE  
-  from DB_CORE_PRD.PSG.VW_CORE_INGESTION_SF_LOAD_STATUS
-  where PROCESS_STATUS = 'COMPLETE'
-    and TABLE_NAME in (select TABLE_NAME from NEW_TABLES)
-  group by TABLE_NAME
-),
- 
-  /* for each new table + day, pick the latest run (if any) in that 14-day window */
- 
-  LATEST_RUN_PER_DAY AS (
- 
-    SELECT
- 
-      TABLE_NAME,
- 
-      CAST(DATE_TRUNC('DAY', START_DT) AS DATE)   AS RUN_DATE,
- 
-      PROCESS_STATUS,
- 
-      ROW_NUMBER() OVER (
- 
-        PARTITION BY TABLE_NAME,
- 
-                     CAST(DATE_TRUNC('DAY', START_DT) AS DATE)
- 
-        ORDER BY START_DT DESC
- 
-      )                                           AS RN
- 
-    FROM   DB_CORE_PRD.PSG.VW_CORE_INGESTION_SF_LOAD_STATUS
- 
-    WHERE  TABLE_NAME IN (SELECT TABLE_NAME FROM NEW_TABLES)
- 
-      AND  CAST(START_DT AS DATE) BETWEEN DATEADD(DAY, -13, CURRENT_DATE())
- 
-                                     AND CURRENT_DATE()
- 
-  )
- 
-SELECT
- 
-  NT.TABLE_NAME,
- 
-  FR.FIRST_RUN_DATE,
- 
-  D.DAY_DT                      AS RUN_DATE,
- 
-  CASE
- 
-    WHEN LR.PROCESS_STATUS = 'COMPLETE' THEN 'Green'
- 
-    WHEN LR.PROCESS_STATUS = 'ERROR'    THEN 'Red'
- 
-    ELSE 'Yellow'
- 
-  END                            AS RUN_STATUS
- 
-FROM   NEW_TABLES NT
- 
-CROSS JOIN LAST_14_DAYS D
- 
-LEFT JOIN LATEST_RUN_PER_DAY LR
- 
-  ON  LR.TABLE_NAME = NT.TABLE_NAME
- 
-  AND LR.RUN_DATE   = D.DAY_DT
- 
-  AND LR.RN         = 1
- 
-  LEFT  JOIN FIRST_RUN fr
-  ON fr.TABLE_NAME = nt.TABLE_NAME
- 
-  ORDER BY NT.TABLE_NAME, d.DAY_DT;
+)
+
+SELECT COUNT(DISTINCT TABLE_NAME) AS NEW_TABLE_COUNT
+FROM NEW_TABLES;
+
+
+
+WITH NEW_TABLES AS (
+    SELECT DISTINCT M.PSG_TABLE_NAME AS TABLE_NAME
+    FROM DB_CORE_PRD.PMD.INSIGHTS_CORE_INGESTION M
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM DB_CORE_PRD.PSG.OPS_TEAM_STATIC_INTERFACE_TABLE SIT
+        WHERE SIT.TABLE_NAME = M.PSG_TABLE_NAME
+    )
+)
+
+SELECT TABLE_NAME
+FROM NEW_TABLES
+ORDER BY TABLE_NAME;
