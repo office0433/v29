@@ -513,8 +513,19 @@ except:
 
 proj_df = session.sql("""
     SELECT INTERFACE_NAME, PSG_TABLE_NAME, PROJECT, SOURCE_SYSTEM
-    FROM DB_CORE_BUSI_MNGD_FILES_PRD.PSG.INSIGHTS_CORE_INGESTION
+    FROM DB_CORE_PRD.PMD.INSIGHTS_CORE_INGESTION
+    WHERE AUDIT_CURRENT = TRUE
+      AND AUDIT_FILE_NAME = 'STREAMLIT_APP'
+      AND PSG_TABLE_NAME IS NOT NULL
+      AND TRIM(PSG_TABLE_NAME) <> ''
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY UPPER(TRIM(PSG_TABLE_NAME))
+        ORDER BY AUDIT_START_DATE DESC, AUDIT_FILE_PROCESSED_DATE DESC
+    ) = 1
 """).to_pandas()
+
+proj_df["PSG_KEY"] = proj_df["PSG_TABLE_NAME"].astype(str).str.strip().str.upper()
+proj_df["INTERFACE_KEY"] = proj_df["INTERFACE_NAME"].astype(str).str.strip().str.upper()
 
 project_map = {}
 for _, r in proj_df.iterrows():
@@ -524,7 +535,7 @@ for _, r in proj_df.iterrows():
         project_map[str(r["INTERFACE_NAME"]).strip().upper()] = r["PROJECT"]
 
 def sort_by_project(t):
-    p = project_map.get(t)
+    p = project_map.get(str(t).strip().upper())
     return (0, str(p).upper(), t) if pd.notna(p) and p else (1, "ZZZ", t)
 
 def sort_by_table_name(t):
@@ -781,8 +792,9 @@ for i, tbl in enumerate(tables):
         st.session_state.approved_tables.pop(tbl, None)
 
     if expand:
+        tbl_key = str(tbl).strip().upper()
         details = proj_df.loc[
-           (proj_df["PSG_TABLE_NAME"] == tbl) | (proj_df["INTERFACE_NAME"] == tbl),
+           (proj_df["PSG_KEY"] == tbl_key) | (proj_df["INTERFACE_KEY"] == tbl_key),
            ["PROJECT", "SOURCE_SYSTEM"]
         ]
         if not details.empty:
