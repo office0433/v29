@@ -1,70 +1,9 @@
-WITH expected AS (
-    SELECT column1 AS EXPECTED_TABLE
-    FROM VALUES
-        ('ASSET_PRODUCT_TYPE'),
-        ('MEDIA_METRICS'),
-        ('ORDERS'),
-        ('ORDER_PAYMENT_ACTION_TYPES')
-),
-
-raw_matches AS (
-    SELECT
-        e.EXPECTED_TABLE,
-        l.PIPELINE,
-        l.AUDIT_JOB_GUID,
-        l.STARTED_AT,
-        l.LOG_LEVEL_NAME,
-
-        REGEXP_INSTR(l.PIPELINE, '/', 1, 1) AS POS_FIRST_SLASH,
-        REGEXP_INSTR(l.PIPELINE, '/', 1, 3) AS POS_THIRD_SLASH,
-        REGEXP_INSTR(l.PIPELINE, '[/][^/]*$', 1) AS POS_LAST_SLASH,
-        REGEXP_INSTR(l.PIPELINE, '.json', 1) AS POS_JSON,
-
-        SUBSTR(
-            l.PIPELINE,
-            REGEXP_INSTR(l.PIPELINE, '[/][^/]*$', 1) + 1,
-            REGEXP_INSTR(l.PIPELINE, '.json', 1) - (REGEXP_INSTR(l.PIPELINE, '[/][^/]*$', 1) + 1)
-        ) AS PARSED_TABLE_NAME
-
-    FROM expected e
-    JOIN DB_CORE_PRD.PMD.AUDIT_INGESTION_LOG l
-        ON UPPER(l.PIPELINE) LIKE '%' || UPPER(e.EXPECTED_TABLE) || '%'
-       AND DATE_TRUNC('DAY', l.STARTED_AT) > CURRENT_DATE - 60
-       AND l.PIPELINE <> 'None'
-),
-
-summary AS (
-    SELECT
-        EXPECTED_TABLE,
-        UPPER(TRIM(PARSED_TABLE_NAME)) AS PARSED_TABLE_NAME,
-        COUNT(*) AS RAW_LOG_ROWS,
-        COUNT(DISTINCT PIPELINE) AS DISTINCT_PIPELINES,
-        COUNT(DISTINCT AUDIT_JOB_GUID) AS DISTINCT_JOBS,
-        MIN(STARTED_AT) AS MIN_STARTED_AT,
-        MAX(STARTED_AT) AS MAX_STARTED_AT,
-        LISTAGG(DISTINCT LOG_LEVEL_NAME, ', ')
-            WITHIN GROUP (ORDER BY LOG_LEVEL_NAME) AS LOG_LEVELS
-    FROM raw_matches
-    GROUP BY
-        EXPECTED_TABLE,
-        UPPER(TRIM(PARSED_TABLE_NAME))
-)
-
-SELECT
-    EXPECTED_TABLE,
-    PARSED_TABLE_NAME,
-    RAW_LOG_ROWS,
-    DISTINCT_PIPELINES,
-    DISTINCT_JOBS,
-    MIN_STARTED_AT,
-    MAX_STARTED_AT,
-    LOG_LEVELS,
-    CASE
-        WHEN PARSED_TABLE_NAME = EXPECTED_TABLE THEN 'Parsed correctly'
-        WHEN PARSED_TABLE_NAME IS NULL OR TRIM(PARSED_TABLE_NAME) = '' THEN 'Pipeline found but parsing returned blank/null'
-        ELSE 'Pipeline found but parsed name differs from expected table'
-    END AS PARSE_DIAGNOSIS
-FROM summary
-ORDER BY
-    EXPECTED_TABLE,
-    MAX_STARTED_AT DESC;
+EXPECTED_TABLE	PARSED_TABLE_NAME	RAW_LOG_ROWS	DISTINCT_PIPELINES	DISTINCT_JOBS	MIN_STARTED_AT	MAX_STARTED_AT	LOG_LEVELS	PARSE_DIAGNOSIS
+MEDIA_METRICS	DAILY_MEDIA_METRICS	4118	1	58	2026-03-21 08:49:17.998	2026-05-19 08:21:08.971	INFO	Pipeline found but parsed name differs from expected table
+MEDIA_METRICS	DAILY_CUMULATIVE_MEDIA_METRICS	4260	1	60	2026-03-21 08:44:50.347	2026-05-19 08:11:14.923	INFO	Pipeline found but parsed name differs from expected table
+MEDIA_METRICS	WEEKLY_MEDIA_METRICS	3976	1	56	2026-03-21 08:48:50.396	2026-05-19 08:11:14.364	INFO	Pipeline found but parsed name differs from expected table
+ORDERS	PURCHASE_ORDERS	183641	1	417	2026-03-21 00:01:39.611	2026-05-19 09:54:01.642	INFO	Pipeline found but parsed name differs from expected table
+ORDERS	B2B2C_ORDERS	6025	1	47	2026-03-21 00:00:18.751	2026-05-19 07:05:55.370	INFO	Pipeline found but parsed name differs from expected table
+ORDERS	BATCH_ORDERS	13050	1	50	2026-03-21 08:04:53.337	2026-05-19 07:05:08.682	INFO	Pipeline found but parsed name differs from expected table
+ORDERS	ITEM_ORDERS_FCT	10500	1	60	2026-03-21 03:05:21.893	2026-05-19 04:07:32.937	INFO	Pipeline found but parsed name differs from expected table
+ORDERS	APPLICATION_ORDERS_LIFECYCLE	8580	1	60	2026-03-21 01:19:02.953	2026-05-19 02:07:22.593	INFO	Pipeline found but parsed name differs from expected table
