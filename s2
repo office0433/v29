@@ -1,0 +1,100 @@
+import re
+import html
+import pandas as pd
+from snowflake.snowpark import Session
+import streamlit as st
+
+st.set_page_config(layout="wide", page_title="Project Handover Form")
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+/* ===== GLOBAL DARK THEME OVERRIDE ===== */
+html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"],
+[data-testid="stHeader"], [data-testid="stMain"],
+[data-testid="stMainBlockContainer"], [data-testid="stVerticalBlock"],
+[data-testid="stHorizontalBlock"], [data-testid="stForm"],
+[data-testid="stBottomBlockContainer"], .main, .block-container,
+section[data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+    background-color: #0e1117 !important; color: #fafafa !important;
+}
+[data-testid="stSidebar"] { background-color: #161b22 !important; }
+
+/* ===== ALL TEXT ELEMENTS — force light text on dark bg ===== */
+p, span, label, div, li, ul, ol, h1, h2, h3, h4, h5, h6, a,
+strong, em, b, i, small, td, th, caption, figcaption,
+[data-testid="stMarkdown"], [data-testid="stMarkdown"] p,
+[data-testid="stMarkdown"] span, [data-testid="stMarkdown"] li,
+[data-testid="stMarkdown"] strong, [data-testid="stMarkdown"] em,
+[data-testid="stMarkdown"] h1, [data-testid="stMarkdown"] h2,
+[data-testid="stMarkdown"] h3, [data-testid="stMarkdown"] h4,
+[data-testid="stText"], [data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] *, [class*="Caption"] {
+    color: #fafafa !important;
+}
+
+/* ===== FORM LABELS — field names must be visible ===== */
+[data-testid="stTextInput"] label,
+[data-testid="stTextInput"] label p,
+[data-testid="stTextInput"] label span,
+[data-testid="stTextArea"] label,
+[data-testid="stTextArea"] label p,
+[data-testid="stTextArea"] label span,
+[data-testid="stSelectbox"] label,
+[data-testid="stSelectbox"] label p,
+[data-testid="stSelectbox"] label span,
+[data-testid="stMultiSelect"] label,
+[data-testid="stMultiSelect"] label p,
+[data-testid="stMultiSelect"] label span,
+[data-testid="stNumberInput"] label,
+[data-testid="stNumberInput"] label p,
+[data-testid="stNumberInput"] label span,
+[data-testid="stDateInput"] label,
+[data-testid="stDateInput"] label p,
+[data-testid="stDateInput"] label span,
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] label p,
+[data-testid="stCheckbox"] label span,
+[data-testid="stRadio"] label,
+[data-testid="stRadio"] label p,
+[data-testid="stRadio"] label span,
+[data-testid="stSlider"] label,
+[data-testid="stSlider"] label p,
+[data-testid="stSlider"] label span,
+[data-testid="stFileUploader"] label,
+[data-testid="stFileUploader"] label p,
+[data-testid="stFileUploader"] label span,
+.stTextInput label, .stTextArea label, .stSelectbox label,
+[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p,
+[data-testid="stWidgetLabel"] span {
+    color: #fafafa !important;
+}
+
+/* ===== INPUT FIELDS ===== */
+[data-testid="stSelectbox"] > div > div,
+[data-baseweb="select"] > div,
+textarea, input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stTextArea"] > div,
+[data-testid="stTextInput"] > div > div,
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stDateInput"] input {
+    background-color: #1c2030 !important; color: #fafafa !important; border-color: #3a3f52 !important;
+    border-radius: 6px !important;
+}
+input::placeholder, textarea::placeholder { color: #6b7280 !important; }
+input:focus, textarea:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 1px #3b82f6 !important; }
+/* Disabled inputs */
+input:disabled, textarea:disabled,
+[data-testid="stTextInput"] input:disabled {
+    background-color: #12151c !important; color: #8b95a5 !important;
+    border-color: #2a3040 !important; -webkit-text-fill-color: #8b95a5 !important;
+}
+
+/* ===== DROPDOWNS / POPOVER MENUS ===== */
+[data-baseweb="popover"], [data-baseweb="popover"] > div,
+[data-baseweb="menu"], [data-baseweb="menu"] li,
+ul[role="listbox"], ul[role="listbox"] li,
