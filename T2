@@ -1,33 +1,861 @@
-WITH APP_TABLES AS (
-    SELECT DISTINCT UPPER(TRIM(TABLE_NAME)) AS TABLE_KEY
-    FROM DB_CORE_PRD.PSG.VW_NEW_INGESTION_STATUS_LAST_14_DAYS
-),
+from datetime import date
+import pandas as pd
+from snowflake.snowpark import Session
+import streamlit as st
 
-PMD_LOOKUP AS (
-    SELECT
-        UPPER(TRIM(PSG_TABLE_NAME)) AS PSG_KEY,
-        UPPER(TRIM(INTERFACE_NAME)) AS INTERFACE_KEY,
-        PSG_TABLE_NAME,
-        INTERFACE_NAME,
-        PROJECT,
-        SOURCE_SYSTEM,
-        AUDIT_FILE_NAME,
-        AUDIT_CURRENT
+st.set_page_config(layout="wide", page_title="Data Ingestion Status")
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+* {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+[data-testid="stAppViewContainer"] {
+    background-color: #0e1117 !important;
+}
+[data-testid="stHeader"] {
+    background-color: #0e1117 !important;
+}
+[data-testid="stSidebar"] {
+    background-color: #262730 !important;
+}
+html, body, [data-testid="stApp"] {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+[data-testid="stSelectbox"] > div > div {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+}
+[data-baseweb="select"] > div {
+    background-color: #262730 !important;
+    border-color: #4a4a5a !important;
+}
+[data-baseweb="popover"] {
+    background-color: #262730 !important;
+}
+[data-baseweb="popover"] > div {
+    background-color: #262730 !important;
+}
+[data-baseweb="menu"] {
+    background-color: #262730 !important;
+}
+[data-baseweb="menu"] li {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+}
+[data-baseweb="menu"] li:hover {
+    background-color: #3a3a4a !important;
+}
+ul[role="listbox"] {
+    background-color: #262730 !important;
+}
+ul[role="listbox"] li {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+}
+ul[role="listbox"] li:hover {
+    background-color: #3a3a4a !important;
+}
+[data-testid="stCheckbox"] {
+    background-color: transparent !important;
+}
+[data-testid="stCheckbox"] > div {
+    background-color: transparent !important;
+}
+[data-testid="stCheckbox"] label {
+    background-color: transparent !important;
+}
+[data-baseweb="checkbox"] {
+    background-color: transparent !important;
+}
+textarea, input, [data-testid="stTextArea"] textarea {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border-color: #4a4a5a !important;
+}
+[data-testid="stTextArea"] > div {
+    background-color: #262730 !important;
+}
+[data-testid="stTextInput"] > div > div {
+    background-color: #262730 !important;
+}
+[data-baseweb="select"] svg {
+    fill: #fafafa !important;
+}
+[data-baseweb="icon"] {
+    color: #fafafa !important;
+}
+[data-testid="stModal"] {
+    background-color: rgba(0,0,0,0.8) !important;
+}
+[data-testid="stModal"] > div {
+    background-color: #1a1a2e !important;
+    color: #fafafa !important;
+}
+[data-testid="stModal"] > div > div {
+    background-color: #1a1a2e !important;
+}
+[role="dialog"] {
+    background-color: #1a1a2e !important;
+    color: #fafafa !important;
+}
+[role="dialog"] > div {
+    background-color: #1a1a2e !important;
+}
+div[data-modal-container="true"] {
+    background-color: rgba(0,0,0,0.8) !important;
+}
+div[data-modal-container="true"] > div {
+    background-color: #1a1a2e !important;
+}
+div[data-modal-container="true"] > div > div {
+    background-color: #1a1a2e !important;
+}
+[data-testid="stModal"] p,
+[data-testid="stModal"] span,
+[data-testid="stModal"] label,
+[data-testid="stModal"] h1,
+[data-testid="stModal"] h2,
+[data-testid="stModal"] h3,
+[role="dialog"] p,
+[role="dialog"] span,
+[role="dialog"] label {
+    color: #fafafa !important;
+}
+button {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border-color: #4a4a5a !important;
+}
+[data-testid="baseButton-secondary"] {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border-color: #4a4a5a !important;
+}
+[data-testid="baseButton-primary"] {
+    background-color: #3b82f6 !important;
+    color: #ffffff !important;
+}
+[data-testid="stModal"] [data-testid="stCaptionContainer"] {
+    color: #9ca3af !important;
+}
+[data-testid="stModal"] .stTextArea label {
+    color: #fafafa !important;
+}
+.main .block-container {
+    padding-top: 0;
+    padding-bottom: 1rem;
+    max-width: 100%;
+}
+.header-container {
+    background: linear-gradient(135deg, #1a2f4a 0%, #2d4a6f 100%);
+    border-radius: 10px;
+    padding: 16px 24px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.header-title {
+    font-size: 24px !important;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+}
+h1.header-title {
+    font-size: 24px !important;
+}
+.header-stats {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.15);
+    padding: 6px 14px;
+    border-radius: 20px;
+    color: white;
+    font-size: 13px;
+}
+.header-stats-number {
+    font-weight: 700;
+    font-size: 16px;
+}
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.legend-inline {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.9);
+}
+.legend-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+}
+.user-badge {
+    font-size: 11px;
+    background: rgba(255,255,255,0.2);
+    padding: 5px 12px;
+    border-radius: 15px;
+    color: white;
+}
+.header-cell {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ecf0f1;
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 0.3px;
+    padding: 10px 0;
+}
+.header-cell-left {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ecf0f1;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 10px 0;
+}
+.table-name-cell {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.date-cell {
+    font-size: 11px;
+    color: #bdc3c7;
+    text-align: center;
+    padding-top: 4px;
+}
+.status-box {
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+    margin: 0 auto;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+.status-box:hover {
+    transform: scale(1.1);
+}
+.status-completed { background: #27ae60; }
+.status-skipped { background: #f39c12; color: #fff; }
+.status-failed { background: #e74c3c; }
+.details-inline {
+    font-size: 10px;
+    color: #bdc3c7;
+    padding: 4px 0 6px 50px;
+    background: #1a1a2e;
+    border-bottom: 1px solid #2d2d44;
+    margin-left: 0;
+}
+.details-inline b {
+    color: #7f8fa6;
+    font-weight: 600;
+}
+.details-inline span {
+    color: #dcdde1;
+}
+.details-inline .not-available {
+    color: #95a5a6;
+    font-style: italic;
+}
+.comment-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #3498db;
+    color: white;
+    font-size: 8px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-left: 4px;
+}
+.comment-display {
+    background: #2d2d44;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin: 4px 0 4px 50px;
+    font-size: 11px;
+    color: #bdc3c7;
+    border-left: 3px solid #3498db;
+}
+.comment-display .comment-author {
+    color: #7f8fa6;
+    font-size: 9px;
+}
+div[data-testid="stCheckbox"] { margin: 0; padding: 0; }
+div[data-testid="stCheckbox"] > label { margin: 0; }
+div[data-testid="stToggle"] { margin: 0; padding: 0; }
+div[data-testid="stToggle"] > label > div { margin: 0; }
+div[data-testid="stSelectbox"] { margin-top: -8px; }
+.stSelectbox > div > div { font-size: 12px; }
+div[data-testid="stHorizontalBlock"] {
+    align-items: center;
+}
+.header-row-bg {
+    background: #2c3e50;
+    border-radius: 6px;
+    padding: 4px 0;
+    margin-bottom: 8px;
+}
+.separator-line {
+    border-bottom: 1px solid #3d3d5c;
+    margin: 0;
+}
+.info-btn-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+.info-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3498db;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    line-height: 1;
+}
+.info-btn:hover {
+    background: #2980b9;
+    transform: scale(1.15);
+}
+.info-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 130%;
+    right: 0;
+    background: #1a1a2e;
+    border: 1px solid #4a4a5a;
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 9999;
+    min-width: 300px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    pointer-events: none;
+}
+.info-btn-wrapper:hover .info-tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+.info-tooltip-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #3498db;
+    margin-bottom: 6px;
+    text-align: left;
+}
+.info-tooltip table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+}
+.info-tooltip th {
+    color: #7f8fa6;
+    font-weight: 600;
+    text-align: left;
+    padding: 3px 6px;
+    border-bottom: 1px solid #3d3d5c;
+    font-size: 9px;
+    text-transform: uppercase;
+}
+.info-tooltip td {
+    color: #dcdde1;
+    padding: 3px 6px;
+    border-bottom: 1px solid #2d2d44;
+    white-space: nowrap;
+}
+.info-tooltip tr:last-child td {
+    border-bottom: none;
+}
+.info-no-data {
+    color: #95a5a6;
+    font-style: italic;
+    font-size: 10px;
+    text-align: center;
+    padding: 8px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+if "last_action" not in st.session_state:
+    st.session_state.last_action = None
+if "approved_tables" not in st.session_state:
+    st.session_state.approved_tables = {}
+if "comments" not in st.session_state:
+    st.session_state.comments = {}
+if "show_confirm" not in st.session_state:
+    st.session_state.show_confirm = False
+
+session = Session.builder.getOrCreate()
+
+user_info = st.user
+user_email = user_info.get("email") if user_info else None
+
+df = session.sql("""
+    SELECT TABLE_NAME, FIRST_RUN_DATE, RUN_DATE, RUN_STATUS
+    FROM DB_CORE_PRD.PSG.VW_NEW_INGESTION_STATUS_LAST_14_DAYS
+""").to_pandas()
+
+df["RUN_DATE"] = pd.to_datetime(df["RUN_DATE"]).dt.date
+df["FIRST_RUN_DATE"] = pd.to_datetime(df["FIRST_RUN_DATE"]).dt.date
+
+dates = sorted(df["RUN_DATE"].unique())
+tables = sorted(df["TABLE_NAME"].unique())
+
+matrix = (
+    df.pivot(index="TABLE_NAME", columns="RUN_DATE", values="RUN_STATUS")
+      .reindex(index=tables, columns=dates)
+      .fillna("Yellow")
+)
+
+time_matrix = None
+try:
+    time_df = session.sql("""
+        SELECT TABLE_NAME, RUN_DATE, RUN_TIME
+        FROM DB_CORE_PRD.PSG.VW_NEW_INGESTION_STATUS_LAST_14_DAYS
+    """).to_pandas()
+    time_df["RUN_DATE"] = pd.to_datetime(time_df["RUN_DATE"]).dt.date
+    time_matrix = (
+        time_df.pivot(index="TABLE_NAME", columns="RUN_DATE", values="RUN_TIME")
+          .reindex(index=tables, columns=dates)
+          .fillna("")
+    )
+except:
+    pass
+
+first_run_map = (
+    df[["TABLE_NAME", "FIRST_RUN_DATE"]]
+      .drop_duplicates("TABLE_NAME")
+      .set_index("TABLE_NAME")["FIRST_RUN_DATE"]
+      .to_dict()
+)
+
+run_history = {}
+try:
+    hist_df = session.sql("""
+        SELECT TABLE_NAME, START_DT, END_DT, PROCESS_STATUS
+        FROM (
+            SELECT TABLE_NAME,
+                   START_DT,
+                   END_DT,
+                   PROCESS_STATUS,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY TABLE_NAME
+                       ORDER BY START_DT DESC
+                   ) AS RN
+            FROM DB_CORE_PRD.PSG.VW_CORE_INGESTION_SF_LOAD_STATUS
+            WHERE PROCESS_STATUS IN ('COMPLETE', 'ERROR')
+        )
+        WHERE RN <= 14
+        ORDER BY TABLE_NAME, START_DT DESC
+    """).to_pandas()
+    hist_df["START_DT"] = pd.to_datetime(hist_df["START_DT"])
+    hist_df["END_DT"] = pd.to_datetime(hist_df["END_DT"])
+    for tbl_name, grp in hist_df.groupby("TABLE_NAME"):
+        rows = []
+        for _, r in grp.iterrows():
+            run_date = r["START_DT"].strftime("%d-%b-%Y")
+            run_day = r["START_DT"].strftime("%a")
+            run_time = r["START_DT"].strftime("%H:%M:%S")
+            status = "✅" if r["PROCESS_STATUS"] == "COMPLETE" else "❌"
+            rows.append((run_date, run_day, run_time, status))
+        run_history[tbl_name] = rows
+except:
+    pass
+
+proj_df = session.sql("""
+    SELECT INTERFACE_NAME, PSG_TABLE_NAME, PROJECT, SOURCE_SYSTEM
     FROM DB_CORE_PRD.PMD.INSIGHTS_CORE_INGESTION
     WHERE AUDIT_CURRENT = TRUE
       AND AUDIT_FILE_NAME = 'STREAMLIT_APP'
-)
+      AND PSG_TABLE_NAME IS NOT NULL
+      AND TRIM(PSG_TABLE_NAME) <> ''
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY UPPER(TRIM(PSG_TABLE_NAME))
+        ORDER BY AUDIT_START_DATE DESC, AUDIT_FILE_PROCESSED_DATE DESC
+    ) = 1
+""").to_pandas()
 
-SELECT
-    A.TABLE_KEY,
-    P.PSG_TABLE_NAME,
-    P.INTERFACE_NAME,
-    P.PROJECT,
-    P.SOURCE_SYSTEM,
-    P.AUDIT_FILE_NAME
-FROM APP_TABLES A
-LEFT JOIN PMD_LOOKUP P
-    ON A.TABLE_KEY = P.PSG_KEY
-    OR A.TABLE_KEY = P.INTERFACE_KEY
-WHERE P.PSG_TABLE_NAME IS NULL
-ORDER BY A.TABLE_KEY;
+proj_df["PSG_KEY"] = proj_df["PSG_TABLE_NAME"].astype(str).str.strip().str.upper()
+proj_df["INTERFACE_KEY"] = proj_df["INTERFACE_NAME"].astype(str).str.strip().str.upper()
+
+project_map = {}
+for _, r in proj_df.iterrows():
+    if pd.notna(r["PSG_TABLE_NAME"]) and str(r["PSG_TABLE_NAME"]).strip():
+        project_map[str(r["PSG_TABLE_NAME"]).strip().upper()] = r["PROJECT"]
+    if pd.notna(r["INTERFACE_NAME"]) and str(r["INTERFACE_NAME"]).strip():
+        project_map[str(r["INTERFACE_NAME"]).strip().upper()] = r["PROJECT"]
+
+def sort_by_project(t):
+    p = project_map.get(str(t).strip().upper())
+    return (0, str(p).upper(), t) if pd.notna(p) and p else (1, "ZZZ", t)
+
+def sort_by_table_name(t):
+    return t.upper()
+
+def sort_by_first_run(t, reverse=False):
+    frd = first_run_map.get(t)
+    if pd.notna(frd):
+        return pd.to_datetime(frd)
+    return pd.Timestamp.max if not reverse else pd.Timestamp.min
+
+tables = sorted(tables, key=sort_by_project)
+
+try:
+    comments_df = session.sql("""
+        SELECT TABLE_NAME, COMMENT_TEXT, AUTHOR, CREATED_AT
+        FROM DB_CORE_PRD.BACKUP_OPS.TABLE_COMMENTS
+    """).to_pandas()
+    for _, row in comments_df.iterrows():
+        st.session_state.comments[row["TABLE_NAME"]] = {
+            "comment": row["COMMENT_TEXT"],
+            "author": row["AUTHOR"],
+            "timestamp": str(row["CREATED_AT"])[:16] if row["CREATED_AT"] else ""
+        }
+except:
+    pass
+
+@st.dialog("💬 Comments")
+def show_comment_dialog(table_name):
+    st.write("**Table:** " + table_name)
+    existing_comment = st.session_state.comments.get(table_name, {})
+    current_text = existing_comment.get("comment", "")
+    new_comment = st.text_area("Add or edit comment:", value=current_text, height=100, key="comment_input_" + table_name)
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        if st.button("💾 Save", use_container_width=True, type="primary"):
+            if new_comment.strip():
+                safe_comment = new_comment.strip().replace("'", "''")
+                merge_sql = """
+                    MERGE INTO DB_CORE_PRD.BACKUP_OPS.TABLE_COMMENTS AS target
+                    USING (SELECT '""" + str(table_name) + """' AS TABLE_NAME) AS source
+                    ON target.TABLE_NAME = source.TABLE_NAME
+                    WHEN MATCHED THEN UPDATE SET
+                        COMMENT_TEXT = '""" + safe_comment + """',
+                        AUTHOR = '""" + str(user_email) + """',
+                        CREATED_AT = CURRENT_TIMESTAMP()
+                    WHEN NOT MATCHED THEN INSERT (TABLE_NAME, COMMENT_TEXT, AUTHOR, CREATED_AT)
+                        VALUES ('""" + str(table_name) + """', '""" + safe_comment + """', '""" + str(user_email) + """', CURRENT_TIMESTAMP())
+                """
+                session.sql(merge_sql).collect()
+                st.session_state.comments[table_name] = {
+                    "comment": new_comment.strip(),
+                    "author": user_email,
+                    "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+                }
+                st.success("Comment saved!")
+                st.rerun()
+            else:
+                st.warning("Please enter a comment.")
+    with col2:
+        if st.button("🗑️ Delete", use_container_width=True):
+            if table_name in st.session_state.comments:
+                delete_sql = "DELETE FROM DB_CORE_PRD.BACKUP_OPS.TABLE_COMMENTS WHERE TABLE_NAME = '" + str(table_name) + "'"
+                session.sql(delete_sql).collect()
+                del st.session_state.comments[table_name]
+                st.success("Comment deleted!")
+                st.rerun()
+    with col3:
+        if st.button("❌ Close", use_container_width=True):
+            st.rerun()
+    if existing_comment:
+        st.markdown("---")
+        st.caption("Last updated by: " + existing_comment.get("author", "Unknown") + " at " + existing_comment.get("timestamp", ""))
+
+@st.dialog("⚠️ Confirm Submission")
+def show_confirm_dialog():
+    st.warning("Approving the table will record your email address against the table name.")
+    st.write("**Tables to approve:** " + str(len(st.session_state.approved_tables)))
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ Confirm", type="primary", use_container_width=True):
+            submitted_batch = []
+            for tbl_name, run_date in st.session_state.approved_tables.items():
+                comment_text = ""
+                if tbl_name in st.session_state.comments:
+                    comment_text = st.session_state.comments[tbl_name].get("comment", "").replace("'", "''")
+                if comment_text:
+                    insert_sql = """
+                        INSERT INTO DB_CORE_PRD.PSG.OPS_TEAM_STATIC_INTERFACE_TABLE
+                        (TABLE_NAME, RUN_DATE, STATUS, SUBMITTED_BY, APPROVED_AT, COMMENT_TEXT)
+                        VALUES ('""" + str(tbl_name) + """', '""" + str(run_date) + """', 'ACCEPTED', '""" + str(user_email) + """', CURRENT_TIMESTAMP(), '""" + comment_text + """')
+                    """
+                else:
+                    insert_sql = """
+                        INSERT INTO DB_CORE_PRD.PSG.OPS_TEAM_STATIC_INTERFACE_TABLE
+                        (TABLE_NAME, RUN_DATE, STATUS, SUBMITTED_BY, APPROVED_AT)
+                        VALUES ('""" + str(tbl_name) + """', '""" + str(run_date) + """', 'ACCEPTED', '""" + str(user_email) + """', CURRENT_TIMESTAMP())
+                    """
+                session.sql(insert_sql).collect()
+                submitted_batch.append((tbl_name, run_date, 'ACCEPTED'))
+            st.session_state.last_action = submitted_batch
+            st.session_state.approved_tables.clear()
+            st.success("✅ Inserted " + str(len(submitted_batch)) + " approved entries.")
+            st.rerun()
+    with col2:
+        if st.button("❌ Cancel", use_container_width=True):
+            st.rerun()
+
+header_html = """
+<div class="header-container">
+    <div class="header-left">
+        <h1 class="header-title">📊 Data Ingestion Status</h1>
+        <div class="header-stats">
+            <span class="header-stats-number">""" + str(len(tables)) + """</span>
+            <span>Tables</span>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="legend-inline">
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#27ae60;">C</div>
+                <span>Completed</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#f39c12;">S</div>
+                <span>Skipped</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#e74c3c;">F</div>
+                <span>Failed</span>
+            </div>
+        </div>
+        <div class="user-badge">👤 """ + str(user_email) + """</div>
+    </div>
+</div>
+"""
+st.markdown(header_html, unsafe_allow_html=True)
+
+col_sort, col_space = st.columns([1, 4])
+with col_sort:
+    sort_order = st.selectbox(
+        "Sort by",
+        ["Project (Default)", "Table Name A-Z", "Table Name Z-A", "First Run ↑", "First Run ↓"],
+        label_visibility="collapsed"
+    )
+
+if sort_order == "Project (Default)":
+    tables = sorted(tables, key=sort_by_project)
+elif sort_order == "Table Name A-Z":
+    tables = sorted(tables, key=sort_by_table_name)
+elif sort_order == "Table Name Z-A":
+    tables = sorted(tables, key=sort_by_table_name, reverse=True)
+elif sort_order == "First Run ↑":
+    tables = sorted(tables, key=lambda t: sort_by_first_run(t, False))
+elif sort_order == "First Run ↓":
+    tables = sorted(tables, key=lambda t: sort_by_first_run(t, True), reverse=True)
+
+col_widths = [0.022, 0.13, 0.022, 0.04] + [0.036] * len(dates) + [0.026, 0.022]
+
+st.markdown('<div class="header-row-bg">', unsafe_allow_html=True)
+hdr = st.columns(col_widths, gap="small")
+hdr[0].markdown("<div class='header-cell'>▼</div>", unsafe_allow_html=True)
+hdr[1].markdown("<div class='header-cell-left'>Table Name</div>", unsafe_allow_html=True)
+hdr[2].markdown("<div class='header-cell'>💬</div>", unsafe_allow_html=True)
+hdr[3].markdown("<div class='header-cell'>1st Run</div>", unsafe_allow_html=True)
+for i, d in enumerate(dates):
+    formatted_date = pd.to_datetime(d).strftime("%d-%b")
+    hdr[i + 4].markdown("<div class='header-cell'>" + formatted_date + "</div>", unsafe_allow_html=True)
+hdr[-2].markdown("<div class='header-cell'>ℹ️</div>", unsafe_allow_html=True)
+hdr[-1].markdown("<div class='header-cell'>✓</div>", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('<div class="separator-line"></div>', unsafe_allow_html=True)
+
+latest = dates[-1]
+
+for i, tbl in enumerate(tables):
+    row = st.columns(col_widths, gap="small")
+
+    with row[0]:
+        expand = st.toggle(" ", key="expand_" + str(i) + "_" + tbl, value=True, label_visibility="collapsed")
+
+    table_display = tbl
+    if tbl in st.session_state.comments:
+        table_display = tbl + " <span class='comment-badge'>!</span>"
+    row[1].markdown("<div class='table-name-cell'>" + table_display + "</div>", unsafe_allow_html=True)
+
+    with row[2]:
+        has_comment = tbl in st.session_state.comments
+        btn_label = "💬" if has_comment else "📝"
+        if st.button(btn_label, key="comment_btn_" + str(i) + "_" + tbl, help="Add/Edit Comment"):
+            show_comment_dialog(tbl)
+
+    frd = first_run_map.get(tbl)
+    if frd is not None and pd.notna(frd):
+        fr_txt = pd.to_datetime(frd).strftime("%d-%b")
+    else:
+        fr_txt = "—"
+    row[3].markdown("<div class='date-cell'>" + fr_txt + "</div>", unsafe_allow_html=True)
+
+    status_map = {
+        "Green": ("status-completed", "C", "Completed"),
+        "Yellow": ("status-skipped", "S", "Skipped"),
+        "Red": ("status-failed", "F", "Failed")
+    }
+
+    for j, d in enumerate(dates):
+        status = matrix.loc[tbl, d]
+        css_class, letter, status_text = status_map.get(status, ("", "?", "Unknown"))
+        tooltip = status_text
+        if time_matrix is not None:
+            run_time = time_matrix.loc[tbl, d]
+            if run_time and str(run_time).strip():
+                tooltip = "Run Time: " + str(run_time) + " | Status: " + status_text
+        row[j + 4].markdown(
+            "<div class='status-box " + css_class + "' title='" + tooltip + "'>" + letter + "</div>",
+            unsafe_allow_html=True
+        )
+
+    hist_rows = run_history.get(tbl, [])
+    if hist_rows:
+        tooltip_rows = ""
+        for run_date, run_day, run_time, status in hist_rows:
+            tooltip_rows += "<tr><td>" + run_date + "</td><td>" + run_day + "</td><td>" + run_time + "</td><td>" + status + "</td></tr>"
+        info_html = """
+        <div class='info-btn-wrapper'>
+            <div class='info-btn'>i</div>
+            <div class='info-tooltip'>
+                <div class='info-tooltip-title'>Last """ + str(len(hist_rows)) + """ Runs</div>
+                <table>
+                    <tr><th>Date</th><th>Day</th><th>Time</th><th>Status</th></tr>
+                    """ + tooltip_rows + """
+                </table>
+            </div>
+        </div>
+        """
+    else:
+        info_html = """
+        <div class='info-btn-wrapper'>
+            <div class='info-btn'>i</div>
+            <div class='info-tooltip'>
+                <div class='info-no-data'>No run history available</div>
+            </div>
+        </div>
+        """
+    row[-2].markdown(info_html, unsafe_allow_html=True)
+
+    with row[-1]:
+        checked = st.checkbox("", key="approve_" + str(i) + "_" + tbl, label_visibility="collapsed")
+
+    if checked:
+        st.session_state.approved_tables[tbl] = latest
+    else:
+        st.session_state.approved_tables.pop(tbl, None)
+
+    if expand:
+        tbl_key = str(tbl).strip().upper()
+        details = proj_df.loc[
+           (proj_df["PSG_KEY"] == tbl_key) | (proj_df["INTERFACE_KEY"] == tbl_key),
+           ["PROJECT", "SOURCE_SYSTEM"]
+        ]
+        if not details.empty:
+            proj = details.iloc[0]["PROJECT"]
+            src = details.iloc[0]["SOURCE_SYSTEM"]
+            if pd.isna(proj) or proj is None or str(proj).strip() == "":
+                proj_display = "<span class='not-available'>Not Available</span>"
+            else:
+                proj_display = "<span>" + str(proj) + "</span>"
+            if pd.isna(src) or src is None or str(src).strip() == "":
+                src_display = "<span class='not-available'>Not Available</span>"
+            else:
+                src_display = "<span>" + str(src) + "</span>"
+            st.markdown(
+                "<div class='details-inline'><b>Project:</b> " + proj_display + " &nbsp;|&nbsp; <b>Source:</b> " + src_display + "</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                "<div class='details-inline'><b>Project:</b> <span class='not-available'>Not Available</span> &nbsp;|&nbsp; <b>Source:</b> <span class='not-available'>Not Available</span></div>",
+                unsafe_allow_html=True
+            )
+        if tbl in st.session_state.comments:
+            comment_data = st.session_state.comments[tbl]
+            st.markdown(
+                "<div class='comment-display'>💬 " + comment_data["comment"] + "<br><span class='comment-author'>— " + comment_data["author"] + " (" + comment_data["timestamp"] + ")</span></div>",
+                unsafe_allow_html=True
+            )
+
+st.markdown("<br>", unsafe_allow_html=True)
+col_btn1, col_btn2, col_spacer = st.columns([1, 1, 4])
+
+with col_btn1:
+    if st.button("✅ Submit", type="primary", use_container_width=True):
+        if len(st.session_state.approved_tables) > 0:
+            show_confirm_dialog()
+        else:
+            st.warning("No tables selected for approval.")
+
+with col_btn2:
+    if st.session_state.last_action:
+        if st.button("↩️ Undo", use_container_width=True):
+            for tbl_name, run_date, status in st.session_state.last_action:
+                undo_sql = """
+                    DELETE FROM DB_CORE_PRD.PSG.OPS_TEAM_STATIC_INTERFACE_TABLE
+                    WHERE (TABLE_NAME, RUN_DATE, STATUS) IN (
+                        SELECT TABLE_NAME, RUN_DATE, STATUS
+                        FROM (
+                            SELECT TABLE_NAME, RUN_DATE, STATUS,
+                                   ROW_NUMBER() OVER (
+                                       PARTITION BY TABLE_NAME, RUN_DATE, STATUS
+                                       ORDER BY APPROVED_AT DESC
+                                   ) AS RN
+                            FROM DB_CORE_PRD.PSG.OPS_TEAM_STATIC_INTERFACE_TABLE
+                            WHERE TABLE_NAME = '""" + str(tbl_name) + """'
+                              AND RUN_DATE   = '""" + str(run_date) + """'
+                              AND STATUS     = '""" + str(status) + """'
+                        )
+                        WHERE RN = 1
+                    );
+                """
+                session.sql(undo_sql).collect()
+            st.success("✅ Undid last action for " + str(len(st.session_state.last_action)) + " table(s).")
+            st.session_state.last_action = None
