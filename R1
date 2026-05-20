@@ -1,0 +1,202 @@
+WITH WPI_LATEST AS (
+    SELECT
+        ITEM_ID,
+        AVG((PRICE_INDEX_REGULAR_PRICE_AMT / NULLIF(WW_REG_PRICE_PSC, 0)) * 100) AS CURRENT_WPI
+    FROM (
+        SELECT
+            ITEM_ID,
+            AREA_STATE_CDE,
+            WK_START_DT,
+            PRICE_INDEX_REGULAR_PRICE_AMT,
+            WW_REG_PRICE_PSC,
+            ROW_NUMBER() OVER (
+                PARTITION BY ITEM_ID, AREA_STATE_CDE
+                ORDER BY WK_START_DT DESC
+            ) AS RN
+        FROM DB_CORE_DATAPROD_COMM_360_PRD.SENSITIVE.COMPETITOR_PRICE_INDEX_ISW
+        WHERE WK_START_DT <= TO_DATE('2025-07-15')
+    )
+    WHERE RN = 1
+    GROUP BY ITEM_ID
+),
+API_LATEST AS (
+    SELECT
+        ITEM_ID,
+        AVG(
+            (PRICE_INDEX_REGULAR_PRICE_AMT / NULLIF(ALDI_ITEM_NORMAL_PRICE_AMT / NULLIF(ALDI_PACK_SIZE_CONVERSION, 0), 0)) * 100
+        ) AS CURRENT_API
+    FROM (
+        SELECT
+            ITEM_ID,
+            AREA_STATE_CDE,
+            WK_START_DT,
+            PRICE_INDEX_REGULAR_PRICE_AMT,
+            ALDI_ITEM_NORMAL_PRICE_AMT,
+            ALDI_PACK_SIZE_CONVERSION,
+            ROW_NUMBER() OVER (
+                PARTITION BY ITEM_ID, AREA_STATE_CDE
+                ORDER BY WK_START_DT DESC
+            ) AS RN
+        FROM DB_CORE_DATAPROD_COMM_360_PRD.SENSITIVE.COMPETITOR_PRICE_INDEX_ISW
+        WHERE WK_START_DT <= TO_DATE('2025-07-15')
+    )
+    WHERE RN = 1
+    GROUP BY ITEM_ID
+)
+SELECT 
+    NULL AS "General Manager",
+    MAX(a14.MERCHANDISE_AREA_DESC) AS "Commercial Category",
+    MAX(a14.MERCHANDISE_GROUP_DESC) AS "BCM Group",
+    ALL_COL.ITEM_IDNT AS "Sell Item",
+    MAX(a13.ITEM_DESC) AS "Sell Item Name",
+    ALL_COL.SUPPLIER_NAME AS "Supplier Name",
+    MAX(a13.DEPT_DESC) AS "Category Name",
+    MAX(a13.CLASS_DESC) AS "Sub Category Name",
+    MAX(a13.CML_PLBL_DESC) AS "Proprietary/Homebrand",
+    MAX(ist.item_status) AS "Item Status",
+    ALL_COL.STORES_RANGED AS "Stores Ranged",
+    MAX(ALL_COL.Actual_Sell_Price) AS "Actual Sell Price",
+    MAX(ALL_COL.Normal_Sell_Price) AS "Normal Sell Price",
+    ROUND(SUM(ALL_COL.COGS) / NULLIF(SUM(ALL_COL.SALES_QTY), 0), 2) AS "Unit Cost Price",
+    SUM(ALL_COL.COGS) AS "COGS (aggregate)",
+    ROUND(SUM(ALL_COL.SALES) / NULLIF(SUM(ALL_COL.SALES_QTY), 0), 2) AS "Unit Price",
+    ALL_COL.Unit_of_Measure AS "Unit of Measure",
+    SUM(ALL_COL.SALES_QTY) AS "Volume Sold (aggregate)",
+    SUM(ALL_COL.SALES) AS "Sales $ (aggregate)",
+    SUM(ALL_COL.STORE_MARKDOWN_AMT + ALL_COL.RECORDED_WASTE_AMT) AS "W.MD",
+    SUM(ALL_COL.PROMO_DEAL_INCOME_AMT + ALL_COL.PROMO_NON_DEAL_INCOME_AMT) AS "Supplier Funding",
+    ROUND((SUM(ALL_COL.FIRST_MARGIN_AMT) / NULLIF(SUM(ALL_COL.SALES), 0)) * 100, 1) AS "1st Margin %",
+    SUM(ALL_COL.FIRST_MARGIN_AMT) AS "1st Margin $",
+    ROUND((SUM(ALL_COL.FIFTH_MARGIN_AMT) / NULLIF(SUM(ALL_COL.SALES), 0)) * 100, 1) AS "5th Margin %",
+    SUM(ALL_COL.FIFTH_MARGIN_AMT) AS "5th Margin $",
+    ROUND(MAX(wpi.CURRENT_WPI), 2) AS "Current WPI",
+    ROUND(MAX(api.CURRENT_API), 2) AS "Current API",
+    a13.DM_RECD_CURR_FLAG AS "Saleable SKU"
+FROM (
+    SELECT
+        s.ITEM_IDNT,
+        s.SUPP_DESC AS SUPPLIER_NAME,
+        s.Count_of_Stores AS STORES_RANGED,
+        s.Actual_Selling_Price as Actual_Sell_Price,
+        s.Normal_Selling_Price as Normal_Sell_Price,
+        s.F_SLS_AMT AS SALES,
+        s.SALESQTY AS SALES_QTY,
+        s.Unit_of_Measure AS Unit_of_Measure,
+        s.COGS,
+        m.FIRST_MARGIN_AMT,
+        m.FIFTH_MARGIN_AMT,
+        m.STORE_MARKDOWN_AMT,
+        m.RECORDED_WASTE_AMT,
+        m.PROMO_DEAL_INCOME_AMT,
+        m.PROMO_NON_DEAL_INCOME_AMT
+    FROM (
+        SELECT
+            a11.SUPP_IDNT,
+            a11.ITEM_IDNT,
+            a11.DAY_IDNT,
+            a13.supp_desc,
+            count(distinct loc_idnt) as Count_of_Stores,
+            MAX(F_ACTUAL_SELL_PRC_AMT) as Actual_Selling_Price,
+            MAX(F_NORM_SELL_PRC_AMT) as Normal_Selling_Price,
+            a14.SELLING_UOM_DESC as Unit_of_Measure,
+            (((NVL(SUM(a11.F_SLS_AMT), 0) - NVL(SUM(a11.F_RTRN_AMT), 0))
+               + NVL(SUM(a11.F_SLS_EMPLY_DISC_AMT), 0))
+               - NVL(SUM(a11.F_RTRN_EMPLY_DISC_AMT), 0)) AS F_SLS_AMT,
+            (NVL(SUM(a11.F_SLS_QTY), 0) - NVL(SUM(a11.F_RTRN_QTY), 0)) AS SALESQTY,
+            SUM((NVL(a11.F_SLS_QTY, 0) + NVL(a11.F_RTRN_QTY, 0)) * NVL(a11.F_NET_INV_UNT_COST_AMT, 0)) AS COGS
+        FROM DB_CORE_PRD.PSG.SLS_ITEM_LD_AGG a11
+        JOIN DB_CORE_PRD.PSG.TIME_DAY_DM a12
+        ON a11.DAY_IDNT = a12.DAY_IDNT
+        JOIN DB_CORE_PRD.PSG.SUPP_DM a13
+        on a11.supp_idnt = a13.supp_idnt
+        JOIN DB_CORE_BIW_DWH_PRD.RDWDM.PROD_ITEM_DIM A14
+        ON a11.item_idnt = a14.item_idnt
+        WHERE a12.DAY_DT BETWEEN TO_DATE('2025-07-01') AND TO_DATE('2025-07-15')
+          AND a11.CHAIN_KEY IN (-2, 1, 8, 14, -1)
+          AND a11.CML_CHANNEL_TYPE_KEY IN (1, 2)
+        GROUP BY a11.SUPP_IDNT, a11.ITEM_IDNT, a11.DAY_IDNT,a13.supp_desc,a14.SELLING_UOM_DESC
+    ) s
+    JOIN (
+        SELECT
+            SKU_IDNT AS ITEM_ID,
+            SUPP_IDNT,
+            DAY_IDNT,
+            SUM(FIRST_MARGIN_AMT) AS FIRST_MARGIN_AMT,
+            SUM(FIFTH_MARGIN_AMT) AS FIFTH_MARGIN_AMT,
+            SUM(STORE_MARKDOWN_AMT) AS STORE_MARKDOWN_AMT,
+            SUM(RECORDED_WASTE_AMT) AS RECORDED_WASTE_AMT,
+            SUM(PROMO_DEAL_INCOME_AMT) AS PROMO_DEAL_INCOME_AMT,
+            SUM(PROMO_NON_DEAL_INCOME_AMT) AS PROMO_NON_DEAL_INCOME_AMT
+        FROM (
+            SELECT
+                MRG.ITEM_IDNT AS SKU_IDNT,
+                MRG.SUPP_IDNT,
+                TD.DAY_IDNT,
+                NVL(MRG.F_1_MARGIN_NET_STDC_AMT, 0) + NVL(MRG.F_SLS_DEAL_IN_NPROM_AMT, 0) AS FIRST_MARGIN_AMT,
+                NVL(MRG.F_1_MARGIN_NET_STDC_AMT, 0)
+                  + NVL(MRG.F_SLS_DEAL_IN_NPROM_AMT, 0)
+                  + NVL(MRG.F_HO_NET_MKDN_AMT, 0)
+                  + NVL(MRG.F_LYLTY_MKDN_AMT, 0)
+                  + NVL((MRG.F_PRC_DSC_RDMPTN_AMT * -1.0), 0)
+                  + NVL(MRG.F_SLS_DEAL_IN_PROMO_AMT, 0)
+                  + NVL(MRG.F_IS_NET_MKDN_AMT, 0)
+                  + NVL(MRG.F_WST_STDC_AMT, 0)
+                  + NVL(MRG.F_SLS_DEAL_IN_SDISC_AMT, 0)
+                  + NVL(MRG.F_CDS_PAYMENT_AMT, 0)
+                  + NVL(MRG.F_CDS_REBATE_AMT, 0) AS FIFTH_MARGIN_AMT,
+                NVL(MRG.F_IS_NET_MKDN_AMT, 0) AS STORE_MARKDOWN_AMT,
+                NVL(MRG.F_WST_STDC_AMT, 0) AS RECORDED_WASTE_AMT,
+                NVL(MRG.F_SLS_DEAL_IN_PROMO_AMT, 0) AS PROMO_DEAL_INCOME_AMT,
+                NVL(MRG.F_SLS_DEAL_IN_NPROM_AMT, 0) AS PROMO_NON_DEAL_INCOME_AMT
+            FROM DB_CORE_PRD.PSG.MARGIN_ITEM_LD_AGG MRG
+            JOIN DB_CORE_PRD.PSG.TIME_DAY_DM TD
+              ON MRG.DAY_IDNT = TD.DAY_IDNT
+            WHERE TD.DAY_DT BETWEEN TO_DATE('2025-07-01') AND TO_DATE('2026-05-05')
+        )
+        GROUP BY SKU_IDNT, SUPP_IDNT, DAY_IDNT
+    ) m
+      ON s.ITEM_IDNT = m.ITEM_ID
+     AND s.SUPP_IDNT = m.SUPP_IDNT
+     AND s.DAY_IDNT = m.DAY_IDNT
+) ALL_COL
+JOIN DB_CORE_PRD.PSG.CML_PROD_LEVEL2_DM a13
+  ON ALL_COL.ITEM_IDNT = a13.LEVEL2_IDNT
+JOIN (
+    SELECT
+        c.dept_key,
+        d.prod_hier_level3_desc AS MERCHANDISE_AREA_DESC,
+        d.prod_hier_level2_desc AS MERCHANDISE_GROUP_DESC
+    FROM DB_CORE_PRD.PSG.PROD_HIER_DEPT_DIM d
+    JOIN DB_CORE_PRD.PSG.PROD_HIER_TYPE_DIM t
+      ON d.prod_hier_type_key = t.prod_hier_type_key
+    JOIN DB_CORE_PRD.PSG.PROD_DEPT_DM c
+      ON d.dept_idnt = c.dept_idnt
+    WHERE t.prod_hier_type_desc = 'GM/GMM Hierarchy'
+      AND t.dm_recd_curr_flag = 'Y'
+) a14
+  ON a13.DEPT_KEY = a14.dept_key
+LEFT JOIN (
+    SELECT
+        item_idnt,
+        cml_item_status_desc AS item_status
+    FROM (
+        SELECT
+            item_idnt,
+            cml_curr_item_status_key,
+            ROW_NUMBER() OVER (
+                PARTITION BY item_idnt
+                ORDER BY cml_item_status_update_dt DESC
+            ) rn
+        FROM DB_CORE_PRD.PSG.CML_ASIS_ITEM_LOC_TRAIT_MTX_DM
+    ) x
+    JOIN DB_CORE_PRD.PSG.CML_STATUS_CDE_DM s
+      ON x.cml_curr_item_status_key = s.cml_item_status_key
+    WHERE rn = 1
+) ist
+  ON ist.item_idnt = ALL_COL.ITEM_IDNT
+LEFT JOIN WPI_LATEST wpi
+  ON wpi.ITEM_ID = ALL_COL.ITEM_IDNT
+LEFT JOIN API_LATEST api
+  ON api.ITEM_ID = ALL_COL.ITEM_IDNT
+--WHERE a13.DM_RECD_CURR_FLAG = 'Y'
+GROUP BY ALL_COL.ITEM_IDNT,ALL_COL.SUPPLIER_NAME,ALL_COL.STORES_RANGED,ALL_COL.Unit_of_Measure,a13.DM_RECD_CURR_FLAG;
